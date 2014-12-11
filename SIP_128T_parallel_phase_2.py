@@ -22,8 +22,8 @@ import mwapy
 ##### Configuration-dependent path ########
 #Parset files path(s)
 
-loc_parset_file    = '/home/562/meb562/MWA_SIP/locs_parset.txt'
-parset_file    = '/home/562/meb562/MWA_SIP/parset.txt'
+loc_parset_file    = '/home/599/aar599/MWA_SIP/locs_parset.txt'
+parset_file    = '/home/599/aar599/MWA_SIP/parset.txt'
 
 ######## Read parameter set file ###########
 
@@ -53,7 +53,9 @@ def autoreduce(fitsfile, expedition, dosub, doimage, dopbcor, out_dir):
     print 'Starting autoreduce (function:autoreduce)'
     vis = fitsfile
     filename = obspath.split('/')[-1]
+    obsid = filename.split('.')[0]
     doSplit = params['doSplit']
+    doCasa = params['doCasa']
     split_uv_range = params['split_uv_range'] 
     if doSplit:
        print 'Splitting out baslines with range:'
@@ -81,196 +83,207 @@ def autoreduce(fitsfile, expedition, dosub, doimage, dopbcor, out_dir):
             splitvises.append(newvis)
         spw=''
     if doimage:
+        if doCasa:
         #### Initialise list
-        threshold=[0,0,0,0,0]
-        params = read_parset(parset_file)
+            threshold=[0,0,0,0,0]
+            params = read_parset(parset_file)
         #### New addition - find initial r.m.s. then clean down to it next time
-        if dormsfind:
+            dormsfind=F
+            if dormsfind:
             #params = read_config(parset_file)
         #### Weighting should be the same
-            cleanweight=params['cleanweight']   
-            robust = params['robust']
-            im_uvrange = params['im_uvrange']
+                cleanweight=params['cleanweight']   
+                robust = params['robust']
+                im_uvrange = params['im_uvrange']
         #### Halve the resolution, keeping image size the same
-            imsize = params['imsize']
+                imsize = params['imsize']
             #[cell, imsize]= getCell_Image_size(vis)
-            imsize = [int(float(imsize[0])/2),int(float(imsize[1])/2)]
+                imsize = [int(float(imsize[0])/2),int(float(imsize[1])/2)]
             #imsize = imsize/2
         #### Original
-            cell = params['cell']
-            scell = re.split('arcmin',cell)
-            ncell = float(scell[0])*2.0
+                cell = params['cell']
+                scell = re.split('arcmin',cell)
+                ncell = float(scell[0])*2.0
             #ncell = float(cell[0])*2.0
             #ncell = cell*2.0
-            scell = str(ncell)+'arcmin'
-            cell = [scell,scell]
-            niter = params['niter']
+                scell = str(ncell)+'arcmin'
+                cell = [scell,scell]
+                niter = params['niter']
         #### Fast options
-            wprojplanes = 1
-            facets = 1
-            cyclefactor = 1.5
+                wprojplanes = 1
+                facets = 1
+                cyclefactor = 1.5
         #### Unchanged
+                psfmode = params['psfmode']
+                imagermode = params['imagermode']
+                mode = params['mode']
+                gridmode = params['gridmode']
+                out_images = []
+                out_stokes = []
+                beam_images = []
+                beam_stokes = []
+                Ext_label = []
+                print cell
+        #### Find noise for each polarisation, since it can be quite different
+                all_stokes = params['stokes']
+                s = 0
+                for stokes in all_stokes:
+                    imagename = 'preview'
+                #                params = read_config()
+                    threshold[s] = params['threshold']
+                    thresh=str(threshold[s])+'Jy'
+                    print 'Imaging a preview image to measure r.m.s. with settings: imsize '+str(imsize)+', cell = '+str(cell)+', niter = '+str(niter)+', clean threshold = '+thresh+', wprojplanes = '+str(wprojplanes)+', stokes= '+stokes
+                    clean(vis=vis,imagename=imagename,mode=mode,gridmode=gridmode, wprojplanes=wprojplanes, facets=facets, niter=niter,threshold=thresh[s],psfmode=psfmode,imagermode=imagermode,cyclefactor=cyclefactor,interactive=False,cell=cell,imsize=imsize,stokes=stokes,weighting=cleanweight,robust=robust,pbcor=False, selectdata=True, uvrange=im_uvrange)
+        #### Mask out the central 50% of the beam to avoid source confusion
+                    if not(os.path.exists('temp.beam')):
+        #### Don't make the beam again if it already exists
+                        file_made = pbcor('preview.image', filename, outname='temp.beam')
+        #### We don't need the automatically-generated beam fits file
+                        os.system('rm beam_temp.beam.fits')
+                    ia.open('preview.image')
+        #### And any sources > 5-6 sigma (i.e. -min of the image)
+                    ia.calcmask(mask='(preview.image < (-min(preview.image)))&&(temp.beam<(0.5*max(temp.beam)))',name='msk')
+                    ia.done()
+        #### Measure first-pass r.m.s.
+                    my_output=imstat('preview.image')
+                    foundrms=my_output['rms']
+        #### Set threshold from measured r.m.s.
+                    threshold[s] = 3*foundrms[0]
+                    print 'Measured r.m.s. of masked image as '+str(foundrms[0])+'Jy'
+                    print 'Setting clean threshold to 3*r.m.s.= '+str(threshold[s])+'Jy'
+                    s+=1
+        #### Delete preview images
+                    rmtables('preview*')
+        #### Delete preview beam
+                    rmtables('temp*')
+        #### NITER should be high, as we are now cleaning down to the noise
+                    niter=20000
+            else:
+                all_stokes = params['stokes']
+                s=0
+                for stokes in all_stokes:
+                    threshold[s] = params['threshold']
+                    s+=1
+                niter = params['niter']
+        #### Imager settings ####
+        #### Move these and other settings to a parset file outside the script.
+        #params = read_config() 
+            im_uvrange = params['im_uvrange']
+            cleanweight=params['cleanweight']   
+            imsize = params['imsize']
+            cell = params['cell']
+            robust = params['robust']
+            wprojplanes = params['wprojplanes']
+            facets = params['facets']
+        #        threshold = params['threshold']
             psfmode = params['psfmode']
+            cyclefactor = params['cyclefactor']
             imagermode = params['imagermode']
             mode = params['mode']
             gridmode = params['gridmode']
+            doStokesI = params['doStokesI']
             out_images = []
             out_stokes = []
             beam_images = []
             beam_stokes = []
             Ext_label = []
-            print cell
-        #### Find noise for each polarisation, since it can be quite different
-            all_stokes = params['stokes']
-            s = 0
-            for stokes in all_stokes:
-                imagename = 'preview'
-#                params = read_config()
-                threshold[s] = params['threshold']
-                thresh=str(threshold[s])+'Jy'
-                print 'Imaging a preview image to measure r.m.s. with settings: imsize '+str(imsize)+', cell = '+str(cell)+', niter = '+str(niter)+', clean threshold = '+thresh+', wprojplanes = '+str(wprojplanes)+', stokes= '+stokes
-                clean(vis=vis,imagename=imagename,mode=mode,gridmode=gridmode, wprojplanes=wprojplanes, facets=facets, niter=niter,threshold=thresh[s],psfmode=psfmode,imagermode=imagermode,cyclefactor=cyclefactor,interactive=False,cell=cell,imsize=imsize,stokes=stokes,weighting=cleanweight,robust=robust,pbcor=False, selectdata=True, uvrange=im_uvrange)
-        #### Mask out the central 50% of the beam to avoid source confusion
-                if not(os.path.exists('temp.beam')):
-        #### Don't make the beam again if it already exists
-                    file_made = pbcor('preview.image', filename, outname='temp.beam')
-        #### We don't need the automatically-generated beam fits file
-                    os.system('rm beam_temp.beam.fits')
-                ia.open('preview.image')
-        #### And any sources > 5-6 sigma (i.e. -min of the image)
-                ia.calcmask(mask='(preview.image < (-min(preview.image)))&&(temp.beam<(0.5*max(temp.beam)))',name='msk')
-                ia.done()
-        #### Measure first-pass r.m.s.
-                my_output=imstat('preview.image')
-                foundrms=my_output['rms']
-        #### Set threshold from measured r.m.s.
-                threshold[s] = 3*foundrms[0]
-                print 'Measured r.m.s. of masked image as '+str(foundrms[0])+'Jy'
-                print 'Setting clean threshold to 3*r.m.s.= '+str(threshold[s])+'Jy'
-                s+=1
-        #### Delete preview images
-                rmtables('preview*')
-        #### Delete preview beam
-            rmtables('temp*')
-        #### NITER should be high, as we are now cleaning down to the noise
-            niter=20000
-        else:
-            all_stokes = params['stokes']
-            s=0
-            for stokes in all_stokes:
-                threshold[s] = params['threshold']
-                s+=1
-            niter = params['niter']
-        #### Imager settings ####
-        #### Move these and other settings to a parset file outside the script.
-        #params = read_config() 
-        im_uvrange = params['im_uvrange']
-        cleanweight=params['cleanweight']   
-        imsize = params['imsize']
-        cell = params['cell']
-        robust = params['robust']
-        wprojplanes = params['wprojplanes']
-        facets = params['facets']
-#        threshold = params['threshold']
-        psfmode = params['psfmode']
-        cyclefactor = params['cyclefactor']
-        imagermode = params['imagermode']
-        mode = params['mode']
-        gridmode = params['gridmode']
-        doStokesI = params['doStokesI']
-        out_images = []
-        out_stokes = []
-        beam_images = []
-        beam_stokes = []
-        Ext_label = []
         #[cell, imsize]= getCell_Image_size(vis)
         #cell = str(cell)+'arcmin' 
         ###################################
         # Image the total bandwidth image #
-        obsid = filename.split('.')[0]
-        s=0
-        for stokes in all_stokes:
-          if stokes == 'XX' or 'YY':
-            imagename = 'f_all_'+stokes
-            thresh=str(threshold[s])+'Jy'
-            print 'Imaging full bandwidth image with settings: imsize = '+str(imsize)+', cell = '+str(cell)+', niter = '+str(niter)+', clean threshold = '+thresh + ', wprojplanes = '+str(wprojplanes) + ', Stokes= '+str(stokes)
-            robust = float(robust)
-            print 'Robust = '+str(robust)
-            clean(vis=vis,imagename=imagename,mode=mode,gridmode=gridmode, wprojplanes=wprojplanes, facets=facets, niter=niter, threshold=thresh, psfmode=psfmode,imagermode=imagermode,cyclefactor=cyclefactor,interactive=False,cell=cell,imsize=imsize,stokes=stokes,weighting=cleanweight,robust=robust,pbcor=False,selectdata=True, uvrange=im_uvrange)
-            if robust < 0:
-               robust = str(robust)
-               robust_str = robust.split('-')[1]
-               outimage = str(obsid)+'_C_bm'+str(robust_str)+'_'+stokes+'.fits'
-            else: 
-               outimage = str(obsid)+'_C_bp'+str(robust)+'_'+stokes+'.fits'
-            #outimage=obsid+'_'+stokes+'.fits'
-            imagename=imagename+".image"
-            execfile('/short/ek6/MWA_Code/MWA_Tools/scripts/casa_fixhdr.py')
-            #exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
-            os.system('mv f_all_'+stokes+'.fits '+outimage)
-            #exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
-            out_images.append(outimage)
-            #out_stokes.append(stokes)
-            #Ext_label.append(imagename)
-            s+=1
-          ##### Stokes I image #####
-        if doStokesI:
-               stokes = 'I'
-               imagename = 'f_all_'+stokes
-               print 'Generating Stokes I image using immath (function:autoreduce)'
-               #print 'Making primary beam maps'
-               # Get the delays from the text file
-               #f = open('delays.txt')
-               #lines = f.readlines()
-               #str_delays = lines[0]
-               #f.close()
-               #os.system('python /short/ek6/MWA_Code/bin/make_beam.py -f '+outimage+' -d '+str_delays) # Make the beam files
-               #XX_beam = obsid+'_XX_beamXX.fits'
-               #YY_beam = obsid+'_XX_beamYY.fits'
-               #XXYYimages=['f_all_XX.image','f_all_YY.image',XX_beam,YY_beam]
-               #immath(imagename=XXYYimages,expr='((IM0/IM2)+(IM1/IM3))/2', outfile=imagename+'.image')
-               #outimage=obsid+'_'+stokes+'.fits'
-               #exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
-               #out_images.append(outimage)
-               #out_stokes.append(stokes)
-               #Ext_label.append(imagename)
-        ############ WSClean ###############
-        WSClean(obsid)
-        ##### Image each sub-band file #####
-        if dosub:
-            for vis in splitvises:
-                visroot,ext=os.path.splitext(vis)
-                s=0
-                for stokes in all_stokes:
-                  if stokes == 'XX' or 'YY':
-                 ### Assume the noise goes as sqrt(bandwidth), so if bandwidth is divided by n, noise goes up as sqrt(n)
-                    thresh=str(threshold[s]*sqrt(nfreqs))+'Jy'
-                    print 'Now imaging '+vis+' in stokes '+stokes+' to clean threshold '+thresh
-                    imagename=visroot+'_'+stokes
-                    clean(vis=vis,imagename=imagename,mode=mode,gridmode=gridmode, wprojplanes=wprojplanes,facets=facets, niter=niter,threshold=thresh, psfmode=psfmode,imagermode=imagermode,cyclefactor=cyclefactor,interactive=False,cell=cell,imsize=imsize,stokes=stokes,weighting=cleanweight,robust=robust,pbcor=False, selectdata=True, uvrange=im_uvrange) 
-                    outimage=obsid+'_'+stokes+'.fits'
-                    exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
-                    out_images.append(outimage)
-                    out_stokes.append(stokes)
-                    Ext_name = imagename.split('/')[-1]
-                    Ext_label.append(Ext_name+'_'+stokes)
+            obsid = filename.split('.')[0]
+            s=0
+
+            for stokes in all_stokes:
+                if stokes == 'XX' or 'YY':
+                    imagename = 'f_all_'+stokes
+                    thresh=str(threshold[s])+'Jy'
+                    print 'Imaging full bandwidth image with settings: imsize = '+str(imsize)+', cell = '+str(cell)+', niter = '+str(niter)+', clean threshold = '+thresh + ', wprojplanes = '+str(wprojplanes) + ', Stokes= '+str(stokes)
+                    robust = float(robust)
+                    print 'Robust = '+str(robust)
+                    clean(vis=vis,imagename=imagename,mode=mode,gridmode=gridmode, wprojplanes=wprojplanes, facets=facets, niter=niter, threshold=thresh, psfmode=psfmode,imagermode=imagermode,cyclefactor=cyclefactor,interactive=False,cell=cell,imsize=imsize,stokes=stokes,weighting=cleanweight,robust=robust,pbcor=False,selectdata=True, uvrange=im_uvrange)
+                if robust < 0:
+                    robust = str(robust)
+                    robust_str = robust.split('-')[1]
+                    outimage = str(obsid)+'_C_bm'+str(robust_str)+'_'+stokes+'.fits'
+                else: 
+                    outimage = str(obsid)+'_C_bp'+str(robust)+'_'+stokes+'.fits'
+                #outimage=obsid+'_'+stokes+'.fits'
+                imagename=imagename+".image"
+                execfile('/short/ek6/MWA_Code/MWA_Tools/scripts/casa_fixhdr.py')
+                #exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
+                os.system('mv f_all_'+stokes+'.fits '+outimage)
+                #exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
+                out_images.append(outimage)
+                #out_stokes.append(stokes)
+                #Ext_label.append(imagename)
+                s+=1
           ##### Stokes I image #####
                 if doStokesI:
                     stokes = 'I'
-                    imagename = visroot+'_'+stokes
-		    print 'Generating Stokes I image using immath (function:autoreduce)'
-                    XXYYimages=['f_all_XX.image','f_all_YY.image','beam_f_all_XX_'+filename+'.fits','beam_f_all_YY_'+filename+'.fits']
-                    immath(imagename=XXYYimages,expr='(IM0*IM2)+(IM1*IM3)/(IM2+IM3)', outfile=imagename+'.image')
-                    outimage=obsid+'_'+stokes+'.fits'
-                    exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
-                    out_images.append(outimage)
-                    out_stokes.append(stokes)
-                    Ext_name = imagename.split('/')[-1]
-                    Ext_label.append(Ext_name+'_'+stokes)
+                    imagename = 'f_all_'+stokes
+                    print 'Generating Stokes I image using immath (function:autoreduce)'
+                    #print 'Making primary beam maps'
+                    # Get the delays from the text file
+                    #f = open('delays.txt')
+                    #lines = f.readlines()
+                    #str_delays = lines[0]
+                    #f.close()
+                    #os.system('python /short/ek6/MWA_Code/bin/make_beam.py -f '+outimage+' -d '+str_delays) # Make the beam files
+                    #XX_beam = obsid+'_XX_beamXX.fits'
+                    #YY_beam = obsid+'_XX_beamYY.fits'
+                    #XXYYimages=['f_all_XX.image','f_all_YY.image',XX_beam,YY_beam]
+                    #immath(imagename=XXYYimages,expr='((IM0/IM2)+(IM1/IM3))/2', outfile=imagename+'.image')
+                    #outimage=obsid+'_'+stokes+'.fits'
+                    #exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
+                    #out_images.append(outimage)
+                    #out_stokes.append(stokes)
+                    #Ext_label.append(imagename)
+
+            ##### Image each sub-band file #####
+            if dosub:
+                for vis in splitvises:
+                    visroot,ext=os.path.splitext(vis)
+                s=0
+                for stokes in all_stokes:
+                    if stokes == 'XX' or 'YY':
+                    ### Assume the noise goes as sqrt(bandwidth), so if bandwidth is divided by n, noise goes up as sqrt(n)
+                        thresh=str(threshold[s]*sqrt(nfreqs))+'Jy'
+                        print 'Now imaging '+vis+' in stokes '+stokes+' to clean threshold '+thresh
+                        imagename=visroot+'_'+stokes
+                        clean(vis=vis,imagename=imagename,mode=mode,gridmode=gridmode, wprojplanes=wprojplanes,facets=facets, niter=niter,threshold=thresh, psfmode=psfmode,imagermode=imagermode,cyclefactor=cyclefactor,interactive=False,cell=cell,imsize=imsize,stokes=stokes,weighting=cleanweight,robust=robust,pbcor=False, selectdata=True, uvrange=im_uvrange) 
+                        outimage=obsid+'_'+stokes+'.fits'
+                        exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
+                        out_images.append(outimage)
+                        out_stokes.append(stokes)
+                        Ext_name = imagename.split('/')[-1]
+                        Ext_label.append(Ext_name+'_'+stokes)
+          ##### Stokes I image #####
+                    if doStokesI:
+                        stokes = 'I'
+                        imagename = visroot+'_'+stokes
+                        print 'Generating Stokes I image using immath (function:autoreduce)'
+                        XXYYimages=['f_all_XX.image','f_all_YY.image','beam_f_all_XX_'+filename+'.fits','beam_f_all_YY_'+filename+'.fits']
+                        immath(imagename=XXYYimages,expr='(IM0*IM2)+(IM1*IM3)/(IM2+IM3)', outfile=imagename+'.image')
+                        outimage=obsid+'_'+stokes+'.fits'
+                        exportfits(fitsimage=outimage,imagename=imagename+".image",stokeslast=False,overwrite=True)
+                        out_images.append(outimage)
+                        out_stokes.append(stokes)
+                        Ext_name = imagename.split('/')[-1]
+                        Ext_label.append(Ext_name+'_'+stokes)
           ###########################
-            print 'Finished imaging all subbands (function:autoreduce)'
-        else:
-            print 'Skipping subband image production stage (function:autoreduce)'
+                print 'Finished imaging all subbands (function:autoreduce)'
+            else:
+                print 'Skipping subband image production stage (function:autoreduce)'
+
+
+
+        ############ WSClean ###############
+        WSClean_startup(obsid)
+
+
+
+
         ######### Merge fits files ##########
         cube = params['cube']
         #master_sync = params['master_sync']
@@ -307,6 +320,8 @@ def autocal(vis):
     '''
     Function to automatically calibrate the data. This function will use setjy or you can define a cl file to calibrate off
     '''
+    locs = read_parset(loc_parset_file)
+    anoko_build = locs['anoko_build']
     params = read_parset(parset_file)
     refant  = params['refant']
     bsolint = params['bsolint']
@@ -328,6 +343,9 @@ def autocal(vis):
                rmtables(bcal)
             bandpass(vis=vis,caltable=bcal,solint=bsolint,refant=refant,bandtype='B',append=False,selectdata=True,uvrange=cal_uvrange,minsnr=minsnr)
             applycal(vis=vis,selectdata=False,gaintable=bcal)
+            # put the visibilities to a fixed phase center
+            if phasecenter!=''
+                    fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
     elif cal_method == 2:
             print 'Using cl method (function:autocal)'
             im.open(vis,usescratch=True)
@@ -338,10 +356,80 @@ def autocal(vis):
                rmtables(bcal)
             bandpass(vis=vis,caltable=bcal,solint=bsolint,refant=refant,bandtype='B',append=False,selectdata=True,uvrange=cal_uvrange,minsnr=minsnr)
             applycal(vis=vis,selectdata=False,gaintable=bcal)
+            # put the visibilities to a fixed phase center
+            if phasecenter!=''
+                    fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
     elif cal_method == 3:
             print 'Using copy solutions method (function:autocal)'
             applycal(vis=vis,selectdata=False,gaintable=cal_loc)
-                        
+            # put the visibilities to a fixed phase center
+            if phasecenter!=''
+                    fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
+
+    elif cal_method == 4:
+            print 'Using selfcal method adapted from GLEAM - Antonia' 
+
+            # first put the new image onto a common phase center given in the parset file, using the CASA fixvis tool
+
+            phasecenter=params['phasecenter']
+            
+            fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
+            
+            wsize = params['wsize']
+            wscale = params['wscale']
+            # Using the primary beam corrected image output from this pipeline from 2min image as the sky model - Here assuming that the model image is made using the exact same parameters as the output images... See GLEAM code for regridding options.
+ 
+            img = cal_loc
+#            obsid=img.split('_')[0]
+
+            # Make primary beam corrected model
+            if not os.path.exists(img+'initcor-I.fits'):
+                cwd = os.getcwd()
+                print 'making primary beam corrected model - Antonia'
+                os.chdir('/short/ek6/aar599/tmp_data/1061661200_calibrator')
+
+                os.system(anoko_build+'/pbcorrect '+img+' model.fits beam '+img+'initcor')
+                os.mkdir('unused')
+                os.system('mv '+img+'initcor-Q.fits unused/.')
+                os.system('mv '+img+'initcor-U.fits unused/.')
+                os.system('mv '+img+'initcor-V.fits unused/.')
+                os.chdir(cwd)
+
+            print 'copying primary beam corrected model - Antonia'
+            os.system('cp '+img+'initcor-I.fits .')
+            img=img.split('/')[-1]
+
+            # Dirty image for initial beam model for target field
+            os.system(anoko_build+'/wsclean -name temp.img -size '+str(wsize)+' '+str(wsize)+' -niter 100 -threshold 0.01 -pol xx,yy,xy,yx -weight briggs -1.0 -scale '+str(wscale)+'  -absmem 57 -joinpolarizations '+vis)
+            print 'dirty image made! - Antonia'
+
+            # Generate the beam models
+            os.system(anoko_build+'/beam -proto temp.img-XX-model.fits -ms '+vis+' -name beam')
+            print 'beam models made - Antonia'
+
+            # Uncorrect the primary beam for this model
+            os.system(anoko_build+'/pbcorrect -uncorrect '+img+'uncor model.fits beam '+img+'initcor')
+
+            print 'beam uncorrected... - Antonia'
+            # Fourier Transform the model to predict the visibilities
+            os.system(anoko_build+'/wsclean -predict -name '+img+'uncor -size '+str(wsize)+' '+str(wsize)+' -pol xx,yy,xy,yx -weight briggs -1.0 -absmem 57 -scale '+str(wscale)+' '+vis)
+
+            print 'model fourier transformed... - Antonia'
+            # Obtain primary beam models and place in useful location
+            if not os.path.isdir('mwapy'):
+                os.mkdir('mwapy')
+                os.mkdir('mwapy/pb')
+            os.system('cp $MWA_CODE_BASE/MWA_Tools/mwapy/pb/*atrix.fits ./mwapy/pb/')
+
+            print 'primary beam models copied... - Antonia'
+            # Use MWA calibrator to calibrate the measurement set using the sky model from the fits file
+            # Try minimum baseline = 60 m (30 lambda at 150 MHz = 2 m) - From GLEAM code.
+            os.system(anoko_build+'/calibrate -minuv 60 -a 0.001 0.0001 -p phases.txt gains.txt '+vis+' solutions.bin')
+
+            print 'Self calibrating - Antonia'
+            # Apply the solutions to the measurement set
+            os.system(anoko_build+'/applysolutions -copy '+vis+' solutions.bin')
+
 ######## Funtions for setting image sizes #########
 
 def getBaselineLengths(msFile='', sort=True):
@@ -372,12 +460,53 @@ def getCell_Image_size(msFile):
     Fudge = 1.0 ###### Increase/decrease to image larger/smaller times the FWHM
     imsize_pixels = int(Fudge*((imsize_deg*60)/cell_size))
     print "Using optimised image size of "+str(imsize_pixels)+' pixels'
+    tb.close()
     return cell_size, imsize_pixels
+
+def getNumIntervals(msFile):
+    tb.open(msFile)
+    lines=tb.getcol('TIME')
+    NumIntervals = len(numpy.unique(lines))
+    timeavg = int(((lines[-1]-lines[0])/NumIntervals)+0.5)
+    tb.close()
+    return NumIntervals, timeavg
+
+def update_TStart(name,tstart):
+    hdulist = pyfits.open(name, mode='update')
+    prihdr = hdulist[0].header
+    prihdr.update('DATE-OBS',tstart)
+    hdulist.flush()
+    return
+
+def rescale_Img(modelImg, rescaleImg):
+    os.system('python /short/ek6/MWA_Code/Aegean/aegean.py  --maxsummits=5 --cores=16 --out='+modelImg+'.cat --table='+modelImg+'.vot --seedclip=30 '+modelImg)
+    os.system('python /short/ek6/MWA_Code/Aegean/aegean.py  --maxsummits=5 --cores=16 --out='+rescaleImg+'.cat --table='+modelImg+'.vot --seedclip=30 '+rescaleImg)
+    matches='matched_sources.vot'
+    os.system('rm -rf matched_sources.vot')
+    os.system('/short/ek6/MWA_Code/stilts/stilts tmatch2 matcher=sky params=10 in1='+rescaleImg+'.vot  values1="ra dec" suffix1="_init" icmd1="select (local_rms<1.)&&(peak_flux/local_rms)>30" in2='+modelImg+'.vot  values2="ra dec" suffix2="_self" icmd2="select (local_rms<1.)&&(peak_flux/local_rms)>30" out='+matches+' fixcols=all')
+    os.system(anoko_build+'/scaleimage '+matches+' peak_flux_init peak_flux_self '+rescaleImg+' rescaled_'+rescaleImg)
+
+###### Need to change filename when tested!
+
 
 ############################################
 ################ WSClean ###################
 
-def WSClean(obs_id):
+def WSClean_startup(obs_id):
+    params = read_parset(parset_file)
+    intervalFraction = int(params['intervalFraction'])
+    if intervalFraction==1:
+        WSClean(obs_id,'A',0,0,0)
+    else:
+        NumIntervals, timeavg = getNumIntervals(obs_id+'.ms')
+#        ObsStart=getObsStart(obs_id+'.ms')
+        fractIntervals = int(NumIntervals/intervalFraction)
+        for i in range(intervalFraction):
+            print 'Input to WSClean:'+str(obs_id)+' '+str(i)+' '+str(i*fractIntervals)+' '+str((i+1)*fractIntervals)+' '+str(timeavg)+' -- Antonia'
+            WSClean(obs_id,i,i*fractIntervals,(i+1)*fractIntervals,timeavg)
+#        exit()
+        
+def WSClean(obs_id,N,start,end,timeavg):
         params  = read_parset(parset_file)
         wniter = params['wniter']
         wsize = params['wsize']
@@ -386,22 +515,41 @@ def WSClean(obs_id):
         wbriggs = params['wbriggs']
         dotwoimages = params['dotwoimages']
         wbriggs2 = params['wbriggs2']
-        #name = str(obs_id)+'_briggs_'+str(wbriggs)
+        ImgRescale = params['ImgRescale']
+
         print 'Running WSClean'
         wbriggs = float(wbriggs) 
         wbriggs2 = float(wbriggs2)
         if wbriggs < 0:
                wbriggs = str(wbriggs)
                briggs_name = wbriggs.split('-')[1]
-               name = obs_id+'_W_bm'+str(briggs_name)
+               name = obs_id+'_'+str(N)+'_W_bm'+str(briggs_name)
         else:
-               name = obs_id+'_W_bp'+str(wbriggs)
+               name = obs_id+'_'+str(N)+'_W_bp'+str(wbriggs)
         locs = read_parset(loc_parset_file)
         anoko_build = locs['anoko_build']
-        os.system(anoko_build+'/wsclean -joinpolarizations -pol xx,xy,yx,yy -mgain 0.95 -weight briggs '+str(wbriggs)+' -absmem 57 -name '+name+' -size '+str(wsize)+' '+str(wsize)+'  -scale '+str(wscale)+' -niter '+str(wniter)+' -threshold '+str(wthreshold)+' '+str(obs_id)+'.ms')
+
+        if N=='A':
+            os.system(anoko_build+'/wsclean -joinpolarizations -pol xx,xy,yx,yy -mgain 0.95 -weight briggs '+str(wbriggs)+' -absmem 57 -name '+name+' -size '+str(wsize)+' '+str(wsize)+'  -scale '+str(wscale)+' -niter '+str(wniter)+' -threshold '+str(wthreshold)+' '+str(obs_id)+'.ms')
+        else:
+            print N
+            print anoko_build+'/wsclean -interval '+str(start)+' '+str(end)+' -joinpolarizations -pol xx,xy,yx,yy -mgain 0.95 -weight briggs '+str(wbriggs)+' -absmem 57 -name '+name+' -size '+str(wsize)+' '+str(wsize)+'  -scale '+str(wscale)+' -niter '+str(wniter)+' -threshold '+str(wthreshold)+' '+str(obs_id)+'.ms -- Antonia'
+            os.system(anoko_build+'/wsclean -interval '+str(start)+' '+str(end)+' -joinpolarizations -pol xx,xy,yx,yy -mgain 0.95 -weight briggs '+str(wbriggs)+' -absmem 57 -name '+name+' -size '+str(wsize)+' '+str(wsize)+'  -scale '+str(wscale)+' -niter '+str(wniter)+' -threshold '+str(wthreshold)+' '+str(obs_id)+'.ms')
+            print 'snapshot '+str(N)+' imaged -- Antonia'
+            
         os.system(anoko_build+'/beam -proto '+name+'-XX-image.fits -ms '+str(obs_id)+'.ms')
         ######### Make the full images 
         os.system(anoko_build+'/pbcorrect '+name+' image.fits beam stokes')
+        if N != 'A': # correct tstart for time sliced images
+            hdulist = pyfits.open('stokes-I.fits')
+            prihdr = hdulist[0].header
+            date = datetime.strptime(prihdr['DATE-OBS'],"%Y-%m-%dT%H:%M:%S.%f")
+            hdulist.flush()
+            tstart = (timedelta(seconds = start*timeavg) + date).strftime("%Y-%m-%dT%H:%M:%S.%f")
+            update_TStart('stokes-I.fits',tstart)
+            update_TStart('stokes-Q.fits',tstart)
+            update_TStart('stokes-U.fits',tstart)
+            update_TStart('stokes-V.fits',tstart)
         os.system('mv stokes-I.fits '+name+'_I.fits')
         os.system('mv stokes-Q.fits '+name+'_Q.fits')
         os.system('mv stokes-U.fits '+name+'_U.fits')
@@ -413,6 +561,12 @@ def WSClean(obs_id):
         new_name_Y = old_name_Y.replace('-YY-image.fits','_YY.fits')
         os.system('mv '+old_name_X+' '+new_name_X)
         os.system('mv '+old_name_Y+' '+new_name_Y)
+
+        if ImgRescale:
+            locs = read_parset(loc_parset_file)
+            modelImg=locs['modelImg']
+            rescale_Img(modelImg, name+'_I.fits')
+
         ################################
         if dotwoimages: # Repeat the imaging with different briggs weighting
            if wbriggs2 < 0:
@@ -421,10 +575,24 @@ def WSClean(obs_id):
                name = obs_id+'_W_bm'+str(wbriggs2)
            else:
                name = obs_id+'_W_bp'+str(wbriggs2)
-           os.system(anoko_build+'/wsclean -joinpolarizations -pol xx,xy,yx,yy -mgain 0.95 -weight briggs '+str(wbriggs2)+' -absmem 57 -name '+name+' -size '+str(wsize)+' '+str(wsize)+'  -scale '+str(wscale)+' -niter '+str(wniter)+' -threshold '+str(wthreshold)+' '+str(obs_id)+'.ms')
-           os.system(anoko_build+'/beam -proto '+name+'-XX-image.fits -ms '+str(obs_id)+'.ms')
+           if N=='A':
+               os.system(anoko_build+'/wsclean -joinpolarizations -pol xx,xy,yx,yy -mgain 0.95 -weight briggs '+str(wbriggs2)+' -absmem 57 -name '+name+' -size '+str(wsize)+' '+str(wsize)+'  -scale '+str(wscale)+' -niter '+str(wniter)+' -threshold '+str(wthreshold)+' '+str(obs_id)+'.ms')
+           else:
+               os.system(anoko_build+'/wsclean -interval '+str(start)+' '+str(end)+' -joinpolarizations -pol xx,xy,yx,yy -mgain 0.95 -weight briggs '+str(wbriggs2)+' -absmem 57 -name '+name+' -size '+str(wsize)+' '+str(wsize)+'  -scale '+str(wscale)+' -niter '+str(wniter)+' -threshold '+str(wthreshold)+' '+str(obs_id)+'.ms')
+        
+           #os.system(anoko_build+'/beam -proto '+name+'-XX-image.fits -ms '+str(obs_id)+'.ms')
            ######### Make the full images 
            os.system(anoko_build+'/pbcorrect '+name+' image.fits beam stokes')
+           if N != 'A': # correct tstart for time sliced images
+               hdulist = pyfits.open('stokes-I.fits')
+               prihdr = hdulist[0].header
+               date = datetime.strptime(prihdr['DATE-OBS'],"%Y-%m-%dT%H:%M:%S.%f")
+               hdulist.flush()
+               tstart = (timedelta(seconds = start*timeavg) + date).strftime("%Y-%m-%dT%H:%M:%S.%f")
+               update_TStart('stokes-I.fits',tstart)
+               update_TStart('stokes-Q.fits',tstart)
+               update_TStart('stokes-U.fits',tstart)
+               update_TStart('stokes-V.fits',tstart)
            os.system('mv stokes-I.fits '+name+'_I.fits')
            os.system('mv stokes-Q.fits '+name+'_Q.fits')
            os.system('mv stokes-U.fits '+name+'_U.fits')

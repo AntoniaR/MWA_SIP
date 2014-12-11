@@ -1,7 +1,11 @@
 # Parset containing the locations of all dependencies and input/output dirs
-error_logs='/home/562/meb562/MWA_SIP/error_logs'
-SIP_home='/home/562/meb562/MWA_SIP'
-msgen_loc='/short/ek6/meb562/tmp_data'
-results_dir='/short/ek6/meb562/SIP_results/MWA_SIP_out'
-anoko_build='/short/ek6/MWA_Code/anoko/mwa-reduce/build_2'
-cal_loc='/home/562/meb562/CALS/1082716392_HydA.cal'
+error_logs='/home/599/aar599/MWA_SIP/error_logs'
+SIP_home='/home/599/aar599/MWA_SIP'
+msgen_loc='/short/ek6/aar599/tmp_data'
+results_dir='/short/ek6/aar599/SIP_results/MWA_SIP_out'
+anoko_build='/short/ek6/MWA_Code/anoko/mwa-reduce/build_4'
+#cal_loc='/home/599/aar599/CAL/1061650704_high_3C444_season1_2456532.cal'
+#cal_loc='/home/599/aar599/MWA_SIP/EoR_field0_new.cl'
+#
+cal_loc='/short/ek6/aar599/tmp_data/1061661200_calibrator/1061661200_W_bm1.0'
+modelImg='/short/ek6/aar599/tmp_data/1061661200_calibrator/1061661200_W_bm1.0_I.fits'

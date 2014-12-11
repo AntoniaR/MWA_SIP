@@ -43,7 +43,7 @@ wprojplanes=1
 # things up considerably. When you need to produce your final image set to
 # ~512. 
 facets=1
-threshold=0.03
+threshold=0.12  #0.03
 # Minimum threshold for cleaning
 psfmode='clark'
 cyclefactor=1.5
@@ -59,7 +59,7 @@ doStokesI=False
 ##################################
 #        Calibration             #
 ##################################
-cal_method=3
+cal_method=4 #2
 # 1 = Setjy; 2 = mutlisource; 3 = copy solutions
 #_________________________________
 refant='Tile012'
@@ -90,9 +90,12 @@ split_uv_range='>0.03klambda'
 wniter=20000
 wsize=3072
 wscale=0.0125
-wthreshold=0.03
+wthreshold=0.1
 wbriggs=-1.0
-dotwoimages=True
+dotwoimages=False #True
 wbriggs2=1.0
+intervalFraction=4
+doCasa=False
+ImgRescale=False
 ########## Clean up ############
 doRemove=True # Remove all data after processing
