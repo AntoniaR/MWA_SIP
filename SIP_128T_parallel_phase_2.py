@@ -13,7 +13,7 @@ import pyfits
 import csv
 
 from mwapy import fits_utils as FU
-from mwapy.pb import mwapb
+#from mwapy.pb import mwapb
 
 import mwapy
 
@@ -344,8 +344,8 @@ def autocal(vis):
             bandpass(vis=vis,caltable=bcal,solint=bsolint,refant=refant,bandtype='B',append=False,selectdata=True,uvrange=cal_uvrange,minsnr=minsnr)
             applycal(vis=vis,selectdata=False,gaintable=bcal)
             # put the visibilities to a fixed phase center
-            if phasecenter!=''
-                    fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
+ #           if phasecenter!=''
+ #                   fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
     elif cal_method == 2:
             print 'Using cl method (function:autocal)'
             im.open(vis,usescratch=True)
@@ -357,23 +357,23 @@ def autocal(vis):
             bandpass(vis=vis,caltable=bcal,solint=bsolint,refant=refant,bandtype='B',append=False,selectdata=True,uvrange=cal_uvrange,minsnr=minsnr)
             applycal(vis=vis,selectdata=False,gaintable=bcal)
             # put the visibilities to a fixed phase center
-            if phasecenter!=''
-                    fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
+#            if phasecenter!=''
+#                    fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
     elif cal_method == 3:
             print 'Using copy solutions method (function:autocal)'
             applycal(vis=vis,selectdata=False,gaintable=cal_loc)
             # put the visibilities to a fixed phase center
-            if phasecenter!=''
-                    fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
+#            if phasecenter!=''
+#                    fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
 
     elif cal_method == 4:
             print 'Using selfcal method adapted from GLEAM - Antonia' 
 
             # first put the new image onto a common phase center given in the parset file, using the CASA fixvis tool
 
-            phasecenter=params['phasecenter']
+#            phasecenter=params['phasecenter']
             
-            fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
+#            fixvis(vis=vis,outputvis=vis,phasecenter=phasecenter)
             
             wsize = params['wsize']
             wscale = params['wscale']
@@ -499,8 +499,10 @@ def WSClean_startup(obs_id):
         WSClean(obs_id,'A',0,0,0)
     else:
         NumIntervals, timeavg = getNumIntervals(obs_id+'.ms')
+        #print 'Antonia test outputs for intervalFractions,NumIntervals and timeavg:',intervalFraction,NumIntervals,timeavg
 #        ObsStart=getObsStart(obs_id+'.ms')
         fractIntervals = int(NumIntervals/intervalFraction)
+        #exit()
         for i in range(intervalFraction):
             print 'Input to WSClean:'+str(obs_id)+' '+str(i)+' '+str(i*fractIntervals)+' '+str((i+1)*fractIntervals)+' '+str(timeavg)+' -- Antonia'
             WSClean(obs_id,i,i*fractIntervals,(i+1)*fractIntervals,timeavg)
