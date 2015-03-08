@@ -289,23 +289,22 @@ def autoreduce(fitsfile, expedition, dosub, doimage, dopbcor, out_dir):
         #master_sync = params['master_sync']
         #master_sync_dir = params['master_sync_dir']
         if cube:
-		print 'Merging all images in to one fits image (function:autoreduce)'
-		print 'INFO: Each subband will be stored as a seprerate Extension'
-		print 'INFO: In ds9 click: Open Other > Open Multi Ext as Data Cube - to view subbands.'
-		merge_all_fits(out_images, out_stokes, filename+'.fits', Ext_label)
-		print 'Merging beam files together'
-		merge_all_fits(beam_images, beam_stokes,'beam_'+filename+'.fits', Ext_label)
-		print 'Moving final image(s) to results folder ('+out_dir+')'
-		shutil.copy(job_path+'/'+filename+'.fits',out_dir)
-		shutil.copy(job_path+'/'+'beam_'+filename+'.fits',out_dir)
-                if master_sync:
-                   print 'Copying files to master directory'
-                   shutil.copy(job_path+'/'+filename+'.fits',master_sync_dir)
-                   shutil.copy(job_path+'/'+'beam_'+filename+'.fits',master_sync_dir)
-                   print 'Syncing files with Sydney server'
-                   os.system('/home/mebell/SIP/sync.go')
-                
-        else:
+            print 'Merging all images in to one fits image (function:autoreduce)'
+            print 'INFO: Each subband will be stored as a seprerate Extension'
+            print 'INFO: In ds9 click: Open Other > Open Multi Ext as Data Cube - to view subbands.'
+            merge_all_fits(out_images, out_stokes, filename+'.fits', Ext_label)
+            print 'Merging beam files together'
+            merge_all_fits(beam_images, beam_stokes,'beam_'+filename+'.fits', Ext_label)
+            print 'Moving final image(s) to results folder ('+out_dir+')'
+            shutil.copy(job_path+'/'+filename+'.fits',out_dir)
+            shutil.copy(job_path+'/'+'beam_'+filename+'.fits',out_dir)
+            if master_sync:
+                print 'Copying files to master directory'
+                shutil.copy(job_path+'/'+filename+'.fits',master_sync_dir)
+                shutil.copy(job_path+'/'+'beam_'+filename+'.fits',master_sync_dir)
+                print 'Syncing files with Sydney server'
+                os.system('/home/mebell/SIP/sync.go')
+            else:
                 print 'Copying all files to results dir (not creating cube)'
                 for im_file in out_images:
                     shutil.copy(im_file,out_dir)
@@ -322,6 +321,7 @@ def autocal(vis):
     '''
     locs = read_parset(loc_parset_file)
     anoko_build = locs['anoko_build']
+    #anoko_build2 = '/short/ek6/MWA_Code/anoko/mwa-reduce/build_4'
     params = read_parset(parset_file)
     refant  = params['refant']
     bsolint = params['bsolint']
@@ -399,8 +399,18 @@ def autocal(vis):
             os.system('cp '+img+'initcor-I.fits .')
             img=img.split('/')[-1]
 
+
+#            print 'Creating edited model - Antonia'
+#            pixelPos=[1769,1796]
+#            dim=3
+#            hdulist=pyfits.open(img+'initcor-I.fits')
+#            hdulist[0].data[0,0,(pixelPos[0]-dim):(pixelPos[0]+dim),(pixelPos[1]-dim):(pixelPos[1]+dim)]= 0 #-5 #= 0.
+#            img=img.split('/')[-1]
+#            hdulist.writeto(img+'initcor-I.fits')
+#            hdulist.close()
+            
             # Dirty image for initial beam model for target field
-            os.system(anoko_build+'/wsclean -name temp.img -size '+str(wsize)+' '+str(wsize)+' -niter 100 -threshold 0.01 -pol xx,yy,xy,yx -weight briggs -1.0 -scale '+str(wscale)+'  -absmem 57 -joinpolarizations '+vis)
+            os.system(anoko_build+'/wsclean -name temp.img -size '+str(wsize)+' '+str(wsize)+' -niter 2 -threshold 0.01 -pol xx,yy,xy,yx -weight briggs -1.0 -scale '+str(wscale)+'  -absmem 57 -joinpolarizations '+vis)
             print 'dirty image made! - Antonia'
 
             # Generate the beam models
@@ -412,7 +422,7 @@ def autocal(vis):
 
             print 'beam uncorrected... - Antonia'
             # Fourier Transform the model to predict the visibilities
-            os.system(anoko_build+'/wsclean -predict -name '+img+'uncor -size '+str(wsize)+' '+str(wsize)+' -pol xx,yy,xy,yx -weight briggs -1.0 -absmem 57 -scale '+str(wscale)+' '+vis)
+            os.system('/short/ek6/MWA_Code/anoko/mwa-reduce/build_4/wsclean -predict -name '+img+'uncor -size '+str(wsize)+' '+str(wsize)+' -pol xx,yy,xy,yx -weight briggs -1.0 -absmem 57 -scale '+str(wscale)+' '+vis)
 
             print 'model fourier transformed... - Antonia'
             # Obtain primary beam models and place in useful location
@@ -539,7 +549,7 @@ def WSClean(obs_id,N,start,end,timeavg):
             os.system(anoko_build+'/wsclean -interval '+str(start)+' '+str(end)+' -joinpolarizations -pol xx,xy,yx,yy -mgain 0.95 -weight briggs '+str(wbriggs)+' -absmem 57 -name '+name+' -size '+str(wsize)+' '+str(wsize)+'  -scale '+str(wscale)+' -niter '+str(wniter)+' -threshold '+str(wthreshold)+' '+str(obs_id)+'.ms')
             print 'snapshot '+str(N)+' imaged -- Antonia'
             
-        os.system(anoko_build+'/beam -proto '+name+'-XX-image.fits -ms '+str(obs_id)+'.ms')
+#        os.system(anoko_build+'/beam -proto '+name+'-XX-image.fits -ms '+str(obs_id)+'.ms')
         ######### Make the full images 
         os.system(anoko_build+'/pbcorrect '+name+' image.fits beam stokes')
         if N != 'A': # correct tstart for time sliced images

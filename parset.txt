@@ -60,7 +60,7 @@ doStokesI=False
 #        Calibration             #
 ##################################
 cal_method=4 #2
-# 1 = Setjy; 2 = mutlisource; 3 = copy solutions
+# 1 = Setjy; 2 = mutlisource; 3 = copy solutions; 4 = self calibration
 #_________________________________
 refant='Tile012'
 bsolint='inf'
@@ -90,11 +90,11 @@ split_uv_range='>0.03klambda'
 wniter=20000
 wsize=3072
 wscale=0.0125
-wthreshold=0.1
+wthreshold=0.2
 wbriggs=-1.0
 dotwoimages=False #True
 wbriggs2=1.0
-intervalFraction=4
+intervalFraction=1
 doCasa=False
 ImgRescale=False
 ########## Clean up ############
