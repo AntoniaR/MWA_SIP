@@ -1,5 +1,5 @@
 #P#!/bin/bash
-#PBS -l walltime=03:30:00
+#PBS -l walltime=02:00:00
 #PBS -l mem=58GB
 #PBS -l ncpus=16
 #PBS -P ek6
@@ -47,6 +47,7 @@ export PGUSER=mwa
 
 # Import raijin python modules
 module load python/2.7.5 python/2.7.5-matplotlib
+module load java
 
 ################# CODE #######################
 #change_db.py curtin

@@ -94,7 +94,7 @@ wthreshold=0.2
 wbriggs=-1.0
 dotwoimages=False #True
 wbriggs2=1.0
-intervalFraction=1
+intervalFraction=4
 doCasa=False
 ImgRescale=False
 ########## Clean up ############

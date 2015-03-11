@@ -11,12 +11,12 @@ import time
 import re
 import pyfits
 import csv
+import commands
 
 from mwapy import fits_utils as FU
 #from mwapy.pb import mwapb
 
 import mwapy
-
 
 ############################################
 ##### Configuration-dependent path ########
@@ -24,6 +24,8 @@ import mwapy
 
 loc_parset_file    = '/home/599/aar599/MWA_SIP/locs_parset.txt'
 parset_file    = '/home/599/aar599/MWA_SIP/parset.txt'
+
+
 
 ######## Read parameter set file ###########
 
@@ -386,7 +388,7 @@ def autocal(vis):
             if not os.path.exists(img+'initcor-I.fits'):
                 cwd = os.getcwd()
                 print 'making primary beam corrected model - Antonia'
-                os.chdir('/short/ek6/aar599/tmp_data/1061661200_calibrator')
+                os.chdir(os.path.dirname(img))
 
                 os.system(anoko_build+'/pbcorrect '+img+' model.fits beam '+img+'initcor')
                 os.mkdir('unused')
@@ -422,7 +424,7 @@ def autocal(vis):
 
             print 'beam uncorrected... - Antonia'
             # Fourier Transform the model to predict the visibilities
-            os.system('/short/ek6/MWA_Code/anoko/mwa-reduce/build_4/wsclean -predict -name '+img+'uncor -size '+str(wsize)+' '+str(wsize)+' -pol xx,yy,xy,yx -weight briggs -1.0 -absmem 57 -scale '+str(wscale)+' '+vis)
+            os.system(anoko_build+'/wsclean -predict -name '+img+'uncor -size '+str(wsize)+' '+str(wsize)+' -pol xx,yy,xy,yx -weight briggs -1.0 -absmem 57 -scale '+str(wscale)+' '+vis)
 
             print 'model fourier transformed... - Antonia'
             # Obtain primary beam models and place in useful location
@@ -496,6 +498,20 @@ def rescale_Img(modelImg, rescaleImg):
     os.system('/short/ek6/MWA_Code/stilts/stilts tmatch2 matcher=sky params=10 in1='+rescaleImg+'.vot  values1="ra dec" suffix1="_init" icmd1="select (local_rms<1.)&&(peak_flux/local_rms)>30" in2='+modelImg+'.vot  values2="ra dec" suffix2="_self" icmd2="select (local_rms<1.)&&(peak_flux/local_rms)>30" out='+matches+' fixcols=all')
     os.system(anoko_build+'/scaleimage '+matches+' peak_flux_init peak_flux_self '+rescaleImg+' rescaled_'+rescaleImg)
 
+def addSoftVerHeader(name):
+    global casaVersion
+    global cotterVersion
+    global AOFlaggerVersion
+    global WSCleanVersion
+    hdulist = pyfits.open(name, mode='update')
+    prihdr = hdulist[0].header
+    prihdr.add_comment(casaVersion)
+    prihdr.add_comment(cotterVersion)
+    prihdr.add_comment(AOFlaggerVersion)
+    prihdr.add_comment(WSCleanVersion)
+    hdulist.flush()
+    return
+    
 ###### Need to change filename when tested!
 
 
@@ -519,6 +535,7 @@ def WSClean_startup(obs_id):
 #        exit()
         
 def WSClean(obs_id,N,start,end,timeavg):
+    
         params  = read_parset(parset_file)
         wniter = params['wniter']
         wsize = params['wsize']
@@ -562,6 +579,12 @@ def WSClean(obs_id,N,start,end,timeavg):
             update_TStart('stokes-Q.fits',tstart)
             update_TStart('stokes-U.fits',tstart)
             update_TStart('stokes-V.fits',tstart)
+        addSoftVerHeader('stokes-I.fits')
+        addSoftVerHeader('stokes-Q.fits')
+        addSoftVerHeader('stokes-U.fits')
+        addSoftVerHeader('stokes-V.fits')
+        addSoftVerHeader(name+'-XX-image.fits')
+        addSoftVerHeader(name+'-YY-image.fits')
         os.system('mv stokes-I.fits '+name+'_I.fits')
         os.system('mv stokes-Q.fits '+name+'_Q.fits')
         os.system('mv stokes-U.fits '+name+'_U.fits')
@@ -605,6 +628,12 @@ def WSClean(obs_id,N,start,end,timeavg):
                update_TStart('stokes-Q.fits',tstart)
                update_TStart('stokes-U.fits',tstart)
                update_TStart('stokes-V.fits',tstart)
+           addSoftVerHeader('stokes-I.fits')
+           addSoftVerHeader('stokes-Q.fits')
+           addSoftVerHeader('stokes-U.fits')
+           addSoftVerHeader('stokes-V.fits')
+           addSoftVerHeader(name+'-XX-image.fits')
+           addSoftVerHeader(name+'-YY-image.fits')
            os.system('mv stokes-I.fits '+name+'_I.fits')
            os.system('mv stokes-Q.fits '+name+'_Q.fits')
            os.system('mv stokes-U.fits '+name+'_U.fits')
@@ -617,6 +646,18 @@ def WSClean(obs_id,N,start,end,timeavg):
            os.system('mv '+old_name_X+' '+new_name_X)
            os.system('mv '+old_name_Y+' '+new_name_Y)
 
+
+############################################
+##### Software Versions used ########
+
+locs = read_parset(loc_parset_file)
+results_dir = locs['results_dir']
+codeVersions = read_parset(results_dir+'/versions.txt')
+cotterVersion=codeVersions['cotterVersion']
+AOFlaggerVersion=codeVersions['AOFlaggerVersion']
+casaVersion=codeVersions['casaVersion']
+WSCleanVersion=codeVersions['WSCleanVersion']
+           
 ############ Run the code ##################
 print '---------------------------------'
 print 'MWA 128T Standard Imaging Pipeline'

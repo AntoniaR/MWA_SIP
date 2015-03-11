@@ -1,5 +1,6 @@
 import os
 import sys
+import commands
 
 # A script to run cotter then CASA. This must be in a 
 # different script to the download becuase we use different
@@ -10,8 +11,8 @@ import sys
 
 ####################################################
 #Parset files path(s)
-loc_parset_file    = '/home/562/meb562/MWA_SIP/locs_parset.txt'
-parset_file    = '/home/562/meb562/MWA_SIP/parset.txt'
+loc_parset_file    = '/home/599/aar599/MWA_SIP/locs_parset.txt'
+parset_file    = '/home/599/aar599/MWA_SIP/parset.txt'
 #####################################################
 
 def read_parset(parset_file):
@@ -41,7 +42,7 @@ OBS_ID_LIST = open(SIP_home+'/obs_id_list.txt', 'r')
 
 def run_cotter(obs_id):
     #os.system('make_metafits.py --gps='+str(obs_id))
-    os.system('cotter -o '+str(obs_id)+'.ms -mem 75 -timeavg 2 -freqavg 4 -m '+str(obs_id)+'.metafits '+str(obs_id)+'/*.fits')
+    os.system('cotter -o '+str(obs_id)+'.ms -mem 75 -timeres 2 -freqres 80 -m '+str(obs_id)+'.metafits '+str(obs_id)+'/*.fits')
 
 ############## Main code ######################
 
@@ -54,12 +55,28 @@ if os.path.exists(str(obs_id)+'.ms'):
    print 'Data already pre-processed, skipping'
 else:    
    run_cotter(obs_id)
+   
 
 uvfits_dir = os.getcwd()
 ######### Run the CASA pipe ##########
 #os.system('change_db.py curtin')
 file_to_process = (str(uvfits_dir)+'/'+str(obs_id)+".ms") 
 print 'Created '+file_to_process+' : parsing to CASA for reduction' 
+
+if not os.path.isfile(results_dir+'/versions.txt') or os.path.getctime(results_dir+'/versions.txt') < os.path.getmtime(locs['anoko_build']):
+    ## BEWARE: This will fail if you try to use an old build. If using an old build, manually delete the versions.txt file
+    ## This will create a new versions.txt file if you are using a younger build than the previous versions.txt
+    ## Alternatively... could delete versions.txt at the very start of every run_pipe... Then could remove the 'or'
+    print 'Creating new versions.txt file'
+    os.system('rm '+results_dir+'/versions.txt')
+    versionFile=open(results_dir+'/versions.txt','w')
+    versionFile.write("cotterVersion='"+str(commands.getstatusoutput('cotter -version')[1].split('\n')[0])+"'\n")
+    versionFile.write("AOFlaggerVersion='"+str(commands.getstatusoutput('cotter -version')[1].split('\n')[1])+"'\n")
+    versionFile.write("casaVersion='"+str(commands.getstatusoutput('which casa')[1])+"'\n")
+    versionFile.write("WSCleanVersion='"+str(commands.getstatusoutput('wsclean -version')[1].split('\n')[1])+"'\n")
+    versionFile.close()
+
+
 os.system("/short/ek6/CASA/casapy-stable-42.0.26465-001-64b/casapy -c "+SIP_home+"/SIP_128T_parallel_phase_2.py  "+file_to_process)
 # Run make_beam.py outside of casa becuase pyephem fails to compile with casa 4.2 THIS IS A PAIN IN THE ARSE!!!!!
 f = open('delays.txt')
